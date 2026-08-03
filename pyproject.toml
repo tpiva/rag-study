@@ -1,0 +1,29 @@
+[project]
+name = "rag-study"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Thiago Piva Magalhaes", email = "thiago.p.magalhaes@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "chromadb>=1.5.9",
+    "fastmcp>=3.4.5",
+    "llama-index-core>=0.14.23",
+    "llama-index-embeddings-huggingface>=0.7.0",
+    "llama-index-vector-stores-chroma>=0.5.5",
+    "pypdf>=6.14.2",
+]
+
+[project.scripts]
+rag-study = "rag_study:main"
+
+[build-system]
+requires = ["uv_build>=0.8.18,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
