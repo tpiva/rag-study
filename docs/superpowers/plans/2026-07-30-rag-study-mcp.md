@@ -108,64 +108,61 @@ git commit -m "chore: scaffold rag-study as an installable uv package"
 
 **Interfaces:**
 - Consumes: environment variables `RAG_DOCS_DIR`, `RAG_STORAGE_DIR`, `RAG_EMBEDDING_MODEL`, `RAG_CHUNK_SIZE`, `RAG_CHUNK_OVERLAP`.
-- Produces: `ConfigError(Exception)`, `get_docs_dir() -> Path`, module-level `STORAGE_DIR: Path`, `EMBEDDING_MODEL: str`, `CHUNK_SIZE: int`, `CHUNK_OVERLAP: int`, `COLLECTION_NAME: str`, `get_embed_model() -> BaseEmbedding` (lazy-imports HuggingFace).
+- Produces: `ConfigError(Exception)`, frozen dataclass `Config` with fields `docs_dir_raw: str | None`, `storage_dir: Path`, `embedding_model: str`, `chunk_size: int`, `chunk_overlap: int`, `collection_name: str`; classmethod `Config.from_env() -> Config`; instance methods `get_docs_dir(self) -> Path` and `get_embed_model(self) -> BaseEmbedding` (lazy-imports HuggingFace).
+
+A `Config` is a plain value object built explicitly via `Config.from_env()` — no module-level state, no `importlib.reload()` needed in tests. Each test just builds a fresh `Config.from_env()` after setting the env vars it cares about.
 
 - [ ] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_config.py
-import importlib
-
 import pytest
 
-
-def _reload_config():
-    from rag_study import config
-    return importlib.reload(config)
+from rag_study.config import Config, ConfigError
 
 
 def test_get_docs_dir_raises_when_env_var_missing(monkeypatch):
     monkeypatch.delenv("RAG_DOCS_DIR", raising=False)
-    config = _reload_config()
-    with pytest.raises(config.ConfigError, match="RAG_DOCS_DIR"):
-        config.get_docs_dir()
+    cfg = Config.from_env()
+    with pytest.raises(ConfigError, match="RAG_DOCS_DIR"):
+        cfg.get_docs_dir()
 
 
 def test_get_docs_dir_raises_when_path_does_not_exist(monkeypatch, tmp_path):
     missing = tmp_path / "nao-existe"
     monkeypatch.setenv("RAG_DOCS_DIR", str(missing))
-    config = _reload_config()
-    with pytest.raises(config.ConfigError, match="não existe"):
-        config.get_docs_dir()
+    cfg = Config.from_env()
+    with pytest.raises(ConfigError, match="não existe"):
+        cfg.get_docs_dir()
 
 
 def test_get_docs_dir_returns_path_when_valid(monkeypatch, tmp_path):
     monkeypatch.setenv("RAG_DOCS_DIR", str(tmp_path))
-    config = _reload_config()
-    assert config.get_docs_dir() == tmp_path
+    cfg = Config.from_env()
+    assert cfg.get_docs_dir() == tmp_path
 
 
 def test_storage_dir_defaults_to_storage_folder(monkeypatch):
     monkeypatch.delenv("RAG_STORAGE_DIR", raising=False)
-    config = _reload_config()
-    assert config.STORAGE_DIR.name == "storage"
+    cfg = Config.from_env()
+    assert cfg.storage_dir.name == "storage"
 
 
 def test_storage_dir_respects_env_override(monkeypatch, tmp_path):
     custom = tmp_path / "custom-storage"
     monkeypatch.setenv("RAG_STORAGE_DIR", str(custom))
-    config = _reload_config()
-    assert config.STORAGE_DIR == custom
+    cfg = Config.from_env()
+    assert cfg.storage_dir == custom
 
 
 def test_chunk_size_defaults_and_override(monkeypatch):
     monkeypatch.delenv("RAG_CHUNK_SIZE", raising=False)
-    config = _reload_config()
-    assert config.CHUNK_SIZE == 512
+    cfg = Config.from_env()
+    assert cfg.chunk_size == 512
 
     monkeypatch.setenv("RAG_CHUNK_SIZE", "256")
-    config = _reload_config()
-    assert config.CHUNK_SIZE == 256
+    cfg = Config.from_env()
+    assert cfg.chunk_size == 256
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -178,6 +175,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'rag_study.config'`
 ```python
 # src/rag_study/config.py
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -185,35 +183,46 @@ class ConfigError(Exception):
     """Raised when required project configuration is missing or invalid."""
 
 
-def get_docs_dir() -> Path:
-    value = os.environ.get("RAG_DOCS_DIR")
-    if not value:
-        raise ConfigError(
-            "RAG_DOCS_DIR não está definida. Configure o caminho da pasta "
-            "com seus documentos, ex: RAG_DOCS_DIR=C:\\Users\\voce\\Documents\\meus-pdfs"
+@dataclass(frozen=True)
+class Config:
+    docs_dir_raw: str | None
+    storage_dir: Path
+    embedding_model: str
+    chunk_size: int
+    chunk_overlap: int
+    collection_name: str = "rag_study_docs"
+
+    @classmethod
+    def from_env(cls) -> "Config":
+        return cls(
+            docs_dir_raw=os.environ.get("RAG_DOCS_DIR"),
+            storage_dir=Path(os.environ.get("RAG_STORAGE_DIR", "storage")),
+            embedding_model=os.environ.get(
+                "RAG_EMBEDDING_MODEL",
+                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            ),
+            chunk_size=int(os.environ.get("RAG_CHUNK_SIZE", "512")),
+            chunk_overlap=int(os.environ.get("RAG_CHUNK_OVERLAP", "50")),
         )
-    path = Path(value)
-    if not path.is_dir():
-        raise ConfigError(
-            f"RAG_DOCS_DIR aponta para um caminho que não existe ou não é uma pasta: {path}"
-        )
-    return path
 
+    def get_docs_dir(self) -> Path:
+        if not self.docs_dir_raw:
+            raise ConfigError(
+                "RAG_DOCS_DIR não está definida. Configure o caminho da pasta "
+                "com seus documentos, ex: RAG_DOCS_DIR=C:\\Users\\voce\\Documents\\meus-pdfs"
+            )
+        path = Path(self.docs_dir_raw)
+        if not path.is_dir():
+            raise ConfigError(
+                f"RAG_DOCS_DIR aponta para um caminho que não existe ou não é uma pasta: {path}"
+            )
+        return path
 
-STORAGE_DIR = Path(os.environ.get("RAG_STORAGE_DIR", "storage"))
-EMBEDDING_MODEL = os.environ.get(
-    "RAG_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-)
-CHUNK_SIZE = int(os.environ.get("RAG_CHUNK_SIZE", "512"))
-CHUNK_OVERLAP = int(os.environ.get("RAG_CHUNK_OVERLAP", "50"))
-COLLECTION_NAME = "rag_study_docs"
+    def get_embed_model(self):
+        """Lazily imports HuggingFaceEmbedding so building a Config stays fast/cheap."""
+        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
-
-def get_embed_model():
-    """Lazily imports HuggingFaceEmbedding so importing config.py stays fast/cheap."""
-    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-    return HuggingFaceEmbedding(model_name=EMBEDDING_MODEL)
+        return HuggingFaceEmbedding(model_name=self.embedding_model)
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -335,7 +344,7 @@ git commit -m "feat: add document loader that skips unreadable files with a warn
 - Test: `tests/test_chunking.py`
 
 **Interfaces:**
-- Consumes: `list[Document]` (from Task 2's `load_documents`), `chunk_size: int`, `chunk_overlap: int` (from Task 1's `config.CHUNK_SIZE` / `config.CHUNK_OVERLAP`).
+- Consumes: `list[Document]` (from Task 2's `load_documents`), `chunk_size: int`, `chunk_overlap: int` (from Task 1's `Config.chunk_size` / `Config.chunk_overlap`).
 - Produces: `split_into_nodes(documents: list[Document], chunk_size: int, chunk_overlap: int) -> list[TextNode]` (`llama_index.core.schema.TextNode`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -415,7 +424,7 @@ git commit -m "feat: add sentence-based chunking of loaded documents"
 - Test: `tests/test_indexing.py`
 
 **Interfaces:**
-- Consumes: `list[TextNode]` (from Task 3), `storage_dir: Path` (from `config.STORAGE_DIR`), an `embed_model` (`BaseEmbedding` — real one from `config.get_embed_model()`, or `MockEmbedding` in tests), `collection_name: str` (from `config.COLLECTION_NAME`).
+- Consumes: `list[TextNode]` (from Task 3), `storage_dir: Path` (from `Config.storage_dir`), an `embed_model` (`BaseEmbedding` — real one from `Config.get_embed_model()`, or `MockEmbedding` in tests), `collection_name: str` (from `Config.collection_name`).
 - Produces: `build_index(nodes, storage_dir, embed_model, collection_name) -> VectorStoreIndex`, `load_index(storage_dir, embed_model, collection_name) -> VectorStoreIndex | None` (returns `None` when no index exists yet).
 
 - [ ] **Step 1: Write the failing tests**
@@ -526,7 +535,7 @@ git commit -m "feat: add ChromaDB-backed index build/load functions"
 - Modify: `pyproject.toml` (add `[project.scripts]` entry)
 
 **Interfaces:**
-- Consumes: `load_documents` (Task 2), `split_into_nodes` (Task 3), `build_index` (Task 4), `config` module (Task 1).
+- Consumes: `load_documents` (Task 2), `split_into_nodes` (Task 3), `build_index` (Task 4), `Config` (Task 1).
 - Produces: `run_ingestion(docs_dir: Path, storage_dir: Path, embed_model, chunk_size: int, chunk_overlap: int, collection_name: str) -> int` (returns number of chunks indexed; prints a human-readable summary), `main() -> None` (CLI entry point wiring `run_ingestion` to `config`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -616,8 +625,8 @@ from pathlib import Path
 
 from llama_index.core.embeddings import BaseEmbedding
 
-from rag_study import config
 from rag_study.chunking import split_into_nodes
+from rag_study.config import Config
 from rag_study.indexing import build_index
 from rag_study.loader import load_documents
 
@@ -646,14 +655,15 @@ def run_ingestion(
 
 
 def main() -> None:
-    docs_dir = config.get_docs_dir()
+    cfg = Config.from_env()
+    docs_dir = cfg.get_docs_dir()
     run_ingestion(
         docs_dir=docs_dir,
-        storage_dir=config.STORAGE_DIR,
-        embed_model=config.get_embed_model(),
-        chunk_size=config.CHUNK_SIZE,
-        chunk_overlap=config.CHUNK_OVERLAP,
-        collection_name=config.COLLECTION_NAME,
+        storage_dir=cfg.storage_dir,
+        embed_model=cfg.get_embed_model(),
+        chunk_size=cfg.chunk_size,
+        chunk_overlap=cfg.chunk_overlap,
+        collection_name=cfg.collection_name,
     )
 
 
@@ -691,7 +701,7 @@ git commit -m "feat: add ingest CLI wiring loader, chunking and indexing togethe
 - Test: `tests/test_search.py`
 
 **Interfaces:**
-- Consumes: `load_index` (Task 4), `config.STORAGE_DIR` / `config.COLLECTION_NAME` (Task 1).
+- Consumes: `load_index` (Task 4), `Config.storage_dir` / `Config.collection_name` (Task 1).
 - Produces: `IndexNotFoundError(Exception)`, `search_documents(query: str, top_k: int, storage_dir: Path, embed_model, collection_name: str) -> list[dict]` — each dict has keys `text: str`, `source: str`, `score: float`. Raises `IndexNotFoundError` when no index exists.
 
 - [ ] **Step 1: Write the failing tests**
@@ -816,7 +826,7 @@ git commit -m "feat: add semantic search over the persisted index"
 - Modify: `pyproject.toml` (add `[project.scripts]` entry)
 
 **Interfaces:**
-- Consumes: `search_documents` / `IndexNotFoundError` (Task 6), `config` module (Task 1).
+- Consumes: `search_documents` / `IndexNotFoundError` (Task 6), `Config` (Task 1).
 - Produces: `format_results(pergunta: str, results: list[dict]) -> str`, `buscar_documentos_core(pergunta: str, top_k: int, storage_dir, embed_model, collection_name) -> str` (pure, injectable — used by both the MCP tool and the tests), the `fastmcp.FastMCP`-registered tool `buscar_documentos(pergunta: str, top_k: int = 5) -> str`, `main() -> None`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -895,7 +905,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 from llama_index.core.embeddings import BaseEmbedding
 
-from rag_study import config
+from rag_study.config import Config
 from rag_study.search import IndexNotFoundError, search_documents
 
 mcp = FastMCP("rag-study")
@@ -934,12 +944,13 @@ def buscar_documentos_core(
 @mcp.tool()
 def buscar_documentos(pergunta: str, top_k: int = 5) -> str:
     """Busca trechos relevantes nos documentos pessoais indexados para responder à pergunta."""
+    cfg = Config.from_env()
     return buscar_documentos_core(
         pergunta=pergunta,
         top_k=top_k,
-        storage_dir=config.STORAGE_DIR,
-        embed_model=config.get_embed_model(),
-        collection_name=config.COLLECTION_NAME,
+        storage_dir=cfg.storage_dir,
+        embed_model=cfg.get_embed_model(),
+        collection_name=cfg.collection_name,
     )
 
 
