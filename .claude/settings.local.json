@@ -4,5 +4,8 @@
       "Skill(claude-api)",
       "Skill(claude-api:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "rag-study"
+  ]
 }

@@ -2,6 +2,7 @@
 from llama_index.core.embeddings import MockEmbedding
 from llama_index.core.schema import TextNode
 
+import rag_study.mcp_server as mcp_server
 from rag_study.indexing import build_index
 from rag_study.mcp_server import buscar_documentos_core, format_results
 
@@ -55,3 +56,31 @@ def test_buscar_documentos_core_returns_formatted_results(tmp_path):
 
     assert "embeddings.txt" in resposta
     assert "Conteudo sobre embeddings locais." in resposta
+
+
+def test_get_embed_model_loads_once_and_reuses_across_calls(monkeypatch):
+    monkeypatch.setattr(mcp_server, "_embed_model_cache", None)
+    calls = []
+
+    class FakeConfig:
+        def get_embed_model(self):
+            calls.append(1)
+            return EMBED_MODEL
+
+    cfg = FakeConfig()
+
+    first = mcp_server._get_embed_model(cfg)
+    second = mcp_server._get_embed_model(cfg)
+
+    assert first is second
+    assert len(calls) == 1
+
+
+def test_main_loads_embed_model_before_serving(monkeypatch):
+    order = []
+    monkeypatch.setattr(mcp_server, "_get_embed_model", lambda cfg: order.append("load"))
+    monkeypatch.setattr(mcp_server.mcp, "run", lambda: order.append("run"))
+
+    mcp_server.main()
+
+    assert order == ["load", "run"]

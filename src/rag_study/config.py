@@ -43,5 +43,6 @@ class Config:
         return path
 
     def get_embed_model(self):
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
         from llama_index.embeddings.huggingface import HuggingFaceEmbedding
         return HuggingFaceEmbedding(model_name=self.embedding_model)

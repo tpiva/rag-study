@@ -53,6 +53,21 @@ flowchart TD
    Claude Desktop or Claude Code starts `uv run rag-mcp-server` as a subprocess and talks to it over the MCP protocol. When you ask a question that needs your documents, Claude calls the `buscar_documentos` tool; the server embeds the query, retrieves the closest chunks from ChromaDB, and returns them with their source filename. Claude then answers grounded in those excerpts.
 3. **If no index exists yet**, the tool returns a clear message telling you to run `rag-ingest` first, instead of crashing.
 
+## Project Structure
+
+```text
+src/rag_study/
+├── config.py       # Config.from_env() — reads env vars, validates RAG_DOCS_DIR, lazily builds the embedding model
+├── loader.py       # load_documents() — reads every file in the docs folder, skips unreadable ones with a warning
+├── chunking.py     # split_into_nodes() — splits Documents into overlapping TextNode chunks (SentenceSplitter)
+├── indexing.py     # build_index() / load_index() — embeds nodes and persists/reloads them in ChromaDB
+├── search.py       # search_documents() — retrieves the closest chunks for a query, raises IndexNotFoundError if no index exists
+├── ingest.py       # run_ingestion() + main() — CLI entry point (`rag-ingest`) wiring loader → chunking → indexing together
+└── mcp_server.py   # buscar_documentos tool + main() — MCP entry point (`rag-mcp-server`) exposing search to Claude
+```
+
+Each module is single-responsibility and has its own test file under `tests/` (`test_config.py`, `test_loader.py`, etc.).
+
 ## Best Practices Used in This Project
 
 - **src-layout** (`src/rag_study/`) — the package is only ever imported from its installed form (`uv init --package`), never accidentally from loose files in the working directory.
