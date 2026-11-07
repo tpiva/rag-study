@@ -37,7 +37,7 @@ flowchart TD
     end
 
     subgraph Query["Query — uv run rag-mcp-server"]
-        F["Claude Desktop /\nClaude Code"] -- "MCP protocol" --> G["mcp_server.py\nbuscar_documentos tool"]
+        F["Claude Desktop /\nClaude Code"] -- "MCP protocol" --> G["mcp_server.py\nsearch_docs tool"]
         G --> H["search.py\nsearch_documents()"]
         H --> E
         H --> G
@@ -50,7 +50,7 @@ flowchart TD
 1. **Ingestion (manual, run whenever documents change):**
    `uv run rag-ingest` reads every file in the folder pointed to by `RAG_DOCS_DIR`, extracts text (skipping — with a warning — any file that fails to parse, e.g. a corrupted or scanned-without-OCR PDF), splits it into overlapping chunks, embeds each chunk locally, and persists everything into a ChromaDB collection under `storage/`.
 2. **Query (via Claude, through MCP):**
-   Claude Desktop or Claude Code starts `uv run rag-mcp-server` as a subprocess and talks to it over the MCP protocol. When you ask a question that needs your documents, Claude calls the `buscar_documentos` tool; the server embeds the query, retrieves the closest chunks from ChromaDB, and returns them with their source filename. Claude then answers grounded in those excerpts.
+   Claude Desktop or Claude Code starts `uv run rag-mcp-server` as a subprocess and talks to it over the MCP protocol. When you ask a question that needs your documents, Claude calls the `search_docs` tool; the server embeds the query, retrieves the closest chunks from ChromaDB, and returns them with their source filename. Claude then answers grounded in those excerpts.
 3. **If no index exists yet**, the tool returns a clear message telling you to run `rag-ingest` first, instead of crashing.
 
 ## Project Structure
@@ -63,7 +63,7 @@ src/rag_study/
 ├── indexing.py     # build_index() / load_index() — embeds nodes and persists/reloads them in ChromaDB
 ├── search.py       # search_documents() — retrieves the closest chunks for a query, raises IndexNotFoundError if no index exists
 ├── ingest.py       # run_ingestion() + main() — CLI entry point (`rag-ingest`) wiring loader → chunking → indexing together
-└── mcp_server.py   # buscar_documentos tool + main() — MCP entry point (`rag-mcp-server`) exposing search to Claude
+└── mcp_server.py   # search_docs tool + main() — MCP entry point (`rag-mcp-server`) exposing search to Claude
 ```
 
 Each module is single-responsibility and has its own test file under `tests/` (`test_config.py`, `test_loader.py`, etc.).

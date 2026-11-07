@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "rag-study": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\Users\\Thiago\\Documents\\estudo\\rag-study",
+        "run",
+        "rag-mcp-server"
+      ],
+      "env": {}
+    }
+  }
+}

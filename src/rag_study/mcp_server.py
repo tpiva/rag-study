@@ -21,18 +21,18 @@ def _get_embed_model(cfg: Config) -> BaseEmbedding:
     return _embed_model_cache
 
 
-def format_results(pergunta: str, results: list[dict]) -> str:
+def format_results(question: str, results: list[dict]) -> str:
     if not results:
-        return f"Nenhum trecho relevante encontrado para: '{pergunta}'."
+        return f"Nenhum trecho relevante encontrado para: '{question}'."
 
-    partes = []
+    parts = []
     for i, result in enumerate(results, start=1):
-        partes.append(f"[{i}] Fonte: {result['source']}\n{result['text']}")
-    return "\n\n".join(partes)
+        parts.append(f"[{i}] Fonte: {result['source']}\n{result['text']}")
+    return "\n\n".join(parts)
 
 
-def buscar_documentos_core(
-    pergunta: str,
+def search_docs_core(
+    question: str,
     top_k: int,
     storage_dir: Path,
     embed_model: BaseEmbedding,
@@ -40,7 +40,7 @@ def buscar_documentos_core(
 ) -> str:
     try:
         results = search_documents(
-            query=pergunta,
+            query=question,
             top_k=top_k,
             storage_dir=storage_dir,
             embed_model=embed_model,
@@ -48,15 +48,15 @@ def buscar_documentos_core(
         )
     except IndexNotFoundError as exc:
         return str(exc)
-    return format_results(pergunta, results)
+    return format_results(question, results)
 
 
 @mcp.tool()
-def buscar_documentos(pergunta: str, top_k: int = 5) -> str:
-    """Busca trechos relevantes nos documentos pessoais indexados para responder à pergunta."""
+def search_docs(question: str, top_k: int = 5) -> str:
+    """Searches the indexed personal documents for passages relevant to the question."""
     cfg = Config.from_env()
-    return buscar_documentos_core(
-        pergunta=pergunta,
+    return search_docs_core(
+        question=question,
         top_k=top_k,
         storage_dir=cfg.storage_dir,
         embed_model=_get_embed_model(cfg),
@@ -65,10 +65,10 @@ def buscar_documentos(pergunta: str, top_k: int = 5) -> str:
 
 
 def main() -> None:
-    # Carrega o modelo de embedding no main thread ANTES de servir. Além de deixar a
-    # primeira busca instantânea, isso evita um deadlock no Windows: carregar as DLLs
-    # nativas (scipy/torch) pela primeira vez dentro da worker thread do FastMCP
-    # travava o servidor indefinidamente na primeira chamada da tool.
+    # Load the embedding model on the main thread BEFORE serving. Besides making the
+    # first search instant, this avoids a deadlock on Windows: loading the native
+    # DLLs (scipy/torch) for the first time inside FastMCP's worker thread hung the
+    # server indefinitely on the first tool call.
     print("[rag-study] carregando modelo de embedding...", file=sys.stderr, flush=True)
     _get_embed_model(Config.from_env())
     print("[rag-study] modelo carregado, servidor pronto.", file=sys.stderr, flush=True)

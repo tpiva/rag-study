@@ -4,7 +4,7 @@ from llama_index.core.schema import TextNode
 
 import rag_study.mcp_server as mcp_server
 from rag_study.indexing import build_index
-from rag_study.mcp_server import buscar_documentos_core, format_results
+from rag_study.mcp_server import search_docs_core, format_results
 
 EMBED_MODEL = MockEmbedding(embed_dim=8)
 
@@ -29,33 +29,33 @@ def test_format_results_handles_empty_results():
     assert "Nenhum trecho relevante" in formatted
 
 
-def test_buscar_documentos_core_returns_friendly_message_when_no_index(tmp_path):
-    resposta = buscar_documentos_core(
-        pergunta="qualquer coisa",
+def test_search_docs_core_returns_friendly_message_when_no_index(tmp_path):
+    answer = search_docs_core(
+        question="qualquer coisa",
         top_k=5,
         storage_dir=tmp_path / "storage",
         embed_model=EMBED_MODEL,
         collection_name="test_mcp_missing",
     )
 
-    assert "rag-ingest" in resposta
+    assert "rag-ingest" in answer
 
 
-def test_buscar_documentos_core_returns_formatted_results(tmp_path):
+def test_search_docs_core_returns_formatted_results(tmp_path):
     storage_dir = tmp_path / "storage"
     nodes = [TextNode(text="Conteudo sobre embeddings locais.", metadata={"file_name": "embeddings.txt"})]
     build_index(nodes, storage_dir, EMBED_MODEL, collection_name="test_mcp_results")
 
-    resposta = buscar_documentos_core(
-        pergunta="O que sao embeddings?",
+    answer = search_docs_core(
+        question="O que sao embeddings?",
         top_k=3,
         storage_dir=storage_dir,
         embed_model=EMBED_MODEL,
         collection_name="test_mcp_results",
     )
 
-    assert "embeddings.txt" in resposta
-    assert "Conteudo sobre embeddings locais." in resposta
+    assert "embeddings.txt" in answer
+    assert "Conteudo sobre embeddings locais." in answer
 
 
 def test_get_embed_model_loads_once_and_reuses_across_calls(monkeypatch):
