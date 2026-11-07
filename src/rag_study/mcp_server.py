@@ -4,8 +4,11 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from llama_index.core.embeddings import BaseEmbedding
+from pydantic import ValidationError
 
 from rag_study.config import Config
+from rag_study.constants import errors
+from rag_study.schemas import SearchDocsSchema
 from rag_study.search import IndexNotFoundError, search_documents
 
 mcp = FastMCP("rag-study")
@@ -21,39 +24,68 @@ def _get_embed_model(cfg: Config) -> BaseEmbedding:
     return _embed_model_cache
 
 
-def format_results(question: str, results: list[dict]) -> str:
-    if not results:
-        return f"No relevant passages found for: '{question}'."
-
-    parts = []
-    for i, result in enumerate(results, start=1):
-        parts.append(f"[{i}] Source: {result['source']}\n{result['text']}")
-    return "\n\n".join(parts)
-
-
 def search_docs_core(
     question: str,
     top_k: int,
     storage_dir: Path,
     embed_model: BaseEmbedding,
     collection_name: str,
-) -> str:
+) -> dict:
+    try:
+        params = SearchDocsSchema(question=question, top_k=top_k)
+    except ValidationError as e:
+        return {
+            "success": False,
+            "message": f"Invalid parameters: {e}",
+            "code": errors.VALIDATION_ERROR,
+            "errors": e.errors(include_url=False, include_context=False),
+        }
+
     try:
         results = search_documents(
-            query=question,
-            top_k=top_k,
+            query=params.question,
+            top_k=params.top_k,
             storage_dir=storage_dir,
             embed_model=embed_model,
             collection_name=collection_name,
         )
     except IndexNotFoundError as exc:
-        return str(exc)
-    return format_results(question, results)
+        return {
+            "success": False,
+            "message": str(exc),
+            "code": errors.INDEX_NOT_FOUND_ERROR,
+        }
+
+    if not results:
+        message = f"No relevant passages found for: '{params.question}'."
+    else:
+        message = f"Found {len(results)} relevant passage(s)."
+    return {"success": True, "message": message, "data": results}
 
 
 @mcp.tool()
-def search_docs(question: str, top_k: int = 5) -> str:
-    """Searches the indexed personal documents for passages relevant to the question."""
+def search_docs(question: str, top_k: int = 5) -> dict:
+    """
+    Searches the indexed personal documents for passages relevant to the question.
+
+    Args:
+        question (str): Natural-language question or search text.
+        top_k (int, optional): Number of passages to return (1-20). Defaults to 5.
+
+    Returns:
+        Dict[str, Union[bool, str, List[Dict[str, Union[str, float]]]]]: Dictionary containing:
+            - On success:
+                * success (bool): True
+                * message (str): Summary of the search
+                * data (List[Dict]): Matching passages, each with:
+                    - text (str): The passage content
+                    - source (str): Source file name
+                    - score (float): Similarity score
+            - On error:
+                * success (bool): False
+                * message (str): Error description
+                * code (str): Specific error code
+    """
     cfg = Config.from_env()
     return search_docs_core(
         question=question,

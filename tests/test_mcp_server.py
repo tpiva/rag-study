@@ -4,33 +4,14 @@ from llama_index.core.schema import TextNode
 
 import rag_study.mcp_server as mcp_server
 from rag_study.indexing import build_index
-from rag_study.mcp_server import search_docs_core, format_results
+from rag_study.constants import errors
+from rag_study.mcp_server import search_docs_core
 
 EMBED_MODEL = MockEmbedding(embed_dim=8)
 
 
-def test_format_results_lists_source_and_snippet_for_each_result():
-    results = [
-        {"text": "Trecho um.", "source": "arquivo1.pdf", "score": 0.9},
-        {"text": "Trecho dois.", "source": "arquivo2.pdf", "score": 0.8},
-    ]
-
-    formatted = format_results("minha pergunta", results)
-
-    assert "arquivo1.pdf" in formatted
-    assert "Trecho um." in formatted
-    assert "arquivo2.pdf" in formatted
-    assert "Trecho dois." in formatted
-
-
-def test_format_results_handles_empty_results():
-    formatted = format_results("pergunta sem resposta", [])
-
-    assert "No relevant passages" in formatted
-
-
-def test_search_docs_core_returns_friendly_message_when_no_index(tmp_path):
-    answer = search_docs_core(
+def test_search_docs_core_returns_error_code_when_no_index(tmp_path):
+    response = search_docs_core(
         question="qualquer coisa",
         top_k=5,
         storage_dir=tmp_path / "storage",
@@ -38,15 +19,17 @@ def test_search_docs_core_returns_friendly_message_when_no_index(tmp_path):
         collection_name="test_mcp_missing",
     )
 
-    assert "rag-ingest" in answer
+    assert response["success"] is False
+    assert response["code"] == errors.INDEX_NOT_FOUND_ERROR
+    assert "rag-ingest" in response["message"]
 
 
-def test_search_docs_core_returns_formatted_results(tmp_path):
+def test_search_docs_core_returns_success_with_data(tmp_path):
     storage_dir = tmp_path / "storage"
     nodes = [TextNode(text="Conteudo sobre embeddings locais.", metadata={"file_name": "embeddings.txt"})]
     build_index(nodes, storage_dir, EMBED_MODEL, collection_name="test_mcp_results")
 
-    answer = search_docs_core(
+    response = search_docs_core(
         question="O que sao embeddings?",
         top_k=3,
         storage_dir=storage_dir,
@@ -54,8 +37,24 @@ def test_search_docs_core_returns_formatted_results(tmp_path):
         collection_name="test_mcp_results",
     )
 
-    assert "embeddings.txt" in answer
-    assert "Conteudo sobre embeddings locais." in answer
+    assert response["success"] is True
+    assert "Found 1 relevant passage" in response["message"]
+    assert response["data"][0]["source"] == "embeddings.txt"
+    assert response["data"][0]["text"] == "Conteudo sobre embeddings locais."
+
+
+def test_search_docs_core_rejects_invalid_parameters(tmp_path):
+    response = search_docs_core(
+        question="   ",
+        top_k=0,
+        storage_dir=tmp_path / "storage",
+        embed_model=EMBED_MODEL,
+        collection_name="test_mcp_invalid",
+    )
+
+    assert response["success"] is False
+    assert response["code"] == errors.VALIDATION_ERROR
+    assert len(response["errors"]) == 2
 
 
 def test_get_embed_model_loads_once_and_reuses_across_calls(monkeypatch):
