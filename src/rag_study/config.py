@@ -31,14 +31,14 @@ class Config:
         value = os.environ.get("RAG_DOCS_DIR")
         if not value:
             raise ConfigError(
-                "RAG_DOCS_DIR não está definida. Configure o caminho da pasta "
-                "com seus documentos, "
-                "ex: RAG_DOCS_DIR=C:\\Users\\voce\\Documents\\meus-pdfs"
+                "RAG_DOCS_DIR is not set. Set it to the path of the folder "
+                "containing your documents, "
+                "e.g. RAG_DOCS_DIR=C:\\Users\\you\\Documents\\my-pdfs"
             )
         path = Path(value)
         if not path.is_dir():
             raise ConfigError(
-                f"RAG_DOCS_DIR aponta para um caminho que não existe ou não é uma pasta: {path}"
+                f"RAG_DOCS_DIR points to a path that does not exist or is not a folder: {path}"
             )
         return path
 

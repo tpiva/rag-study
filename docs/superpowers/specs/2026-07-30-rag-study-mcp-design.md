@@ -29,7 +29,7 @@ Fluxo:
 1. O usuário roda `uv run src/ingest.py` sempre que adicionar/alterar documentos na pasta externa.
 2. O script extrai texto, quebra em chunks, gera embeddings localmente (HuggingFace) e grava/atualiza o índice ChromaDB em `storage/`.
 3. No Claude Desktop ou Claude Code, o usuário pergunta algo sobre seus documentos.
-4. O Claude decide chamar a tool `buscar_documentos` do servidor MCP.
+4. O Claude decide chamar a tool `search_docs` do servidor MCP.
 5. O servidor MCP consulta o ChromaDB via LlamaIndex e retorna os trechos mais relevantes, com a fonte (nome do arquivo + página).
 6. O Claude usa esses trechos para responder, citando de qual documento veio a informação.
 
@@ -49,12 +49,12 @@ Fluxo:
 
 - **`config.py`** — centraliza caminhos (pasta externa de documentos, diretório de storage do ChromaDB), parâmetros de chunking e nome do modelo de embedding. Evita "magic values" espalhados pelo código.
 - **`ingest.py`** — usa `SimpleDirectoryReader` do LlamaIndex para ler os documentos da pasta configurada, quebra em chunks com um `NodeParser`, gera embeddings via `HuggingFaceEmbedding` e persiste no ChromaDB. Rodado manualmente pelo usuário.
-- **`mcp_server.py`** — usa o SDK oficial `mcp` para expor a tool `buscar_documentos(pergunta, top_k=5)`, que carrega o índice existente no ChromaDB, faz a busca semântica via LlamaIndex e retorna os trechos relevantes com a fonte. Processo de longa duração, configurado nos dois clientes Claude.
+- **`mcp_server.py`** — usa o SDK oficial `mcp` para expor a tool `search_docs(question, top_k=5)`, que carrega o índice existente no ChromaDB, faz a busca semântica via LlamaIndex e retorna os trechos relevantes com a fonte. Processo de longa duração, configurado nos dois clientes Claude.
 
 ## Tratamento de erros
 
 - Documentos corrompidos ou sem texto extraível (ex: PDF escaneado sem OCR) são pulados durante a ingestão com um aviso no console — não interrompem o processo inteiro.
-- Se o índice em `storage/` ainda não existir quando o servidor MCP subir, a tool `buscar_documentos` retorna uma mensagem clara pedindo para rodar a ingestão primeiro, em vez de quebrar.
+- Se o índice em `storage/` ainda não existir quando o servidor MCP subir, a tool `search_docs` retorna uma mensagem clara pedindo para rodar a ingestão primeiro, em vez de quebrar.
 
 ## Notas de estudo
 

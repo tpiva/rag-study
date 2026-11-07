@@ -39,7 +39,7 @@ flowchart TD
     end
 
     subgraph Consulta["Consulta — uv run rag-mcp-server"]
-        F["Claude Desktop /\nClaude Code"] -- "protocolo MCP" --> G["mcp_server.py\ntool buscar_documentos"]
+        F["Claude Desktop /\nClaude Code"] -- "protocolo MCP" --> G["mcp_server.py\ntool search_docs"]
         G --> H["search.py\nsearch_documents()"]
         H --> E
         H --> G
@@ -52,7 +52,7 @@ flowchart TD
 1. **Ingestão (manual, rodada sempre que os documentos mudam):**
    `uv run rag-ingest` lê todos os arquivos da pasta apontada por `RAG_DOCS_DIR`, extrai o texto (pulando — com aviso — qualquer arquivo que falhe, ex: um PDF corrompido ou escaneado sem OCR), divide em chunks com sobreposição, gera o embedding de cada chunk localmente, e persiste tudo numa coleção ChromaDB dentro de `storage/`.
 2. **Consulta (via Claude, pelo MCP):**
-   O Claude Desktop ou Claude Code sobe `uv run rag-mcp-server` como subprocesso e conversa com ele pelo protocolo MCP. Quando você faz uma pergunta que precisa dos seus documentos, o Claude chama a tool `buscar_documentos`; o servidor gera o embedding da pergunta, recupera os chunks mais próximos no ChromaDB e devolve com o nome do arquivo de origem. O Claude então responde com base nesses trechos.
+   O Claude Desktop ou Claude Code sobe `uv run rag-mcp-server` como subprocesso e conversa com ele pelo protocolo MCP. Quando você faz uma pergunta que precisa dos seus documentos, o Claude chama a tool `search_docs`; o servidor gera o embedding da pergunta, recupera os chunks mais próximos no ChromaDB e devolve com o nome do arquivo de origem. O Claude então responde com base nesses trechos.
 3. **Se ainda não existir um índice**, a tool retorna uma mensagem clara pedindo pra rodar `rag-ingest` primeiro, em vez de quebrar.
 
 ### Estrutura do Projeto
@@ -65,7 +65,7 @@ src/rag_study/
 ├── indexing.py     # build_index() / load_index() — gera embeddings dos nodes e persiste/recarrega no ChromaDB
 ├── search.py       # search_documents() — recupera os chunks mais próximos de uma pergunta, levanta IndexNotFoundError se não houver índice
 ├── ingest.py       # run_ingestion() + main() — entry point de CLI (`rag-ingest`) que junta loader → chunking → indexing
-└── mcp_server.py   # tool buscar_documentos + main() — entry point MCP (`rag-mcp-server`) que expõe a busca ao Claude
+└── mcp_server.py   # tool search_docs + main() — entry point MCP (`rag-mcp-server`) que expõe a busca ao Claude
 ```
 
 Cada módulo tem responsabilidade única e seu próprio arquivo de teste em `tests/` (`test_config.py`, `test_loader.py`, etc.).

@@ -14,7 +14,7 @@ def load_documents(docs_dir: Path) -> list[Document]:
                 input_files=[str(file_path)], raise_on_error=True
             ).load_data()
         except Exception as exc:
-            print(f"[aviso] Pulando '{file_path.name}': não foi possível extrair texto ({exc})")
+            print(f"[warning] Skipping '{file_path.name}': could not extract text ({exc})")
             continue
 
         documents.extend(loaded)

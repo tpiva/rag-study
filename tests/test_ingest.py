@@ -25,7 +25,7 @@ def test_run_ingestion_indexes_all_readable_documents(tmp_path, capsys):
     assert chunk_count == 2
     assert storage_dir.exists()
     captured = capsys.readouterr()
-    assert "2 documento" in captured.out
+    assert "2 document" in captured.out
     assert "2 chunk" in captured.out
 
 
@@ -47,7 +47,7 @@ def test_run_ingestion_skips_corrupted_files_and_still_indexes_rest(tmp_path, ca
 
     assert chunk_count == 1
     captured = capsys.readouterr()
-    assert "[aviso]" in captured.out
+    assert "[warning]" in captured.out
 
 
 def test_run_ingestion_returns_zero_and_warns_on_empty_folder(tmp_path, capsys):
@@ -66,4 +66,4 @@ def test_run_ingestion_returns_zero_and_warns_on_empty_folder(tmp_path, capsys):
 
     assert chunk_count == 0
     captured = capsys.readouterr()
-    assert "Nenhum documento" in captured.out
+    assert "No readable documents" in captured.out

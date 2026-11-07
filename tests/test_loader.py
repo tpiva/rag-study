@@ -29,7 +29,7 @@ def test_load_documents_skips_corrupted_file_with_warning(tmp_path, capsys):
     assert documents[0].text == "Documento valido."
     captured = capsys.readouterr()
     assert "quebrado.pdf" in captured.out
-    assert "[aviso]" in captured.out
+    assert "[warning]" in captured.out
 
 
 def test_load_documents_returns_empty_list_for_empty_folder(tmp_path):

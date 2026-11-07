@@ -26,7 +26,7 @@ def test_format_results_lists_source_and_snippet_for_each_result():
 def test_format_results_handles_empty_results():
     formatted = format_results("pergunta sem resposta", [])
 
-    assert "Nenhum trecho relevante" in formatted
+    assert "No relevant passages" in formatted
 
 
 def test_search_docs_core_returns_friendly_message_when_no_index(tmp_path):

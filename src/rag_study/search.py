@@ -15,8 +15,8 @@ def search_documents(
     index = load_index(storage_dir, embed_model, collection_name)
     if index is None:
         raise IndexNotFoundError(
-            "Nenhum índice encontrado. Rode 'uv run rag-ingest' para indexar seus "
-            "documentos antes de consultar."
+            "No index found. Run 'uv run rag-ingest' to index your "
+            "documents before searching."
         )
     retriever = index.as_retriever(similarity_top_k=top_k)
     scored_nodes = retriever.retrieve(query)
@@ -27,7 +27,7 @@ def search_documents(
         results.append(
             {
                 "text": node.get_content(),
-                "source": node.metadata.get("file_name", "desconhecido"),
+                "source": node.metadata.get("file_name", "unknown"),
                 "score": scored_node.score if scored_node.score is not None else 0.0,
             }
         )

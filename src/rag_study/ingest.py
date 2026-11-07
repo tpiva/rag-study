@@ -19,15 +19,15 @@ def run_ingestion(
 ) -> int:
     documents = load_documents(docs_dir)
     if not documents:
-        print(f"Nenhum documento legível encontrado em '{docs_dir}'.")
+        print(f"No readable documents found in '{docs_dir}'.")
         return 0
 
     nodes = split_into_nodes(documents, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     build_index(nodes, storage_dir, embed_model, collection_name)
 
     print(
-        f"{len(documents)} documento(s) indexado(s) em {len(nodes)} chunk(s). "
-        f"Índice salvo em '{storage_dir}'."
+        f"{len(documents)} document(s) indexed into {len(nodes)} chunk(s). "
+        f"Index saved to '{storage_dir}'."
     )
     return len(nodes)
 

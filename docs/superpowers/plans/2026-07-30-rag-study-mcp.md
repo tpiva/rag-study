@@ -4,7 +4,7 @@
 
 **Goal:** Build a local MCP server that lets Claude (Desktop and Claude Code) semantically search a personal, mostly-PDF document folder, backed by a locally-embedded ChromaDB index — with zero paid Anthropic API calls in the project's code.
 
-**Architecture:** A CLI ingestion script (`ingest.py`) reads documents from an externally configured folder, chunks them, embeds them locally via HuggingFace, and persists them to a local ChromaDB index. A separate MCP server process (`mcp_server.py`) loads that index and exposes a single search tool (`buscar_documentos`) that Claude calls over the MCP protocol. Both scripts share `config.py`, `loader.py`, `chunking.py`, and `indexing.py`.
+**Architecture:** A CLI ingestion script (`ingest.py`) reads documents from an externally configured folder, chunks them, embeds them locally via HuggingFace, and persists them to a local ChromaDB index. A separate MCP server process (`mcp_server.py`) loads that index and exposes a single search tool (`search_docs`) that Claude calls over the MCP protocol. Both scripts share `config.py`, `loader.py`, `chunking.py`, and `indexing.py`.
 
 **Tech Stack:** Python 3.11+, `uv` (package/env manager, project built as an installable package via `uv init --package`), LlamaIndex (`llama-index-core`), `llama-index-embeddings-huggingface` (local embeddings), `llama-index-vector-stores-chroma` + `chromadb` (vector store), `fastmcp` (standalone FastMCP framework), `pytest`.
 
@@ -132,7 +132,7 @@ def test_get_docs_dir_raises_when_path_does_not_exist(monkeypatch, tmp_path):
     missing = tmp_path / "nao-existe"
     monkeypatch.setenv("RAG_DOCS_DIR", str(missing))
     cfg = Config.from_env()
-    with pytest.raises(ConfigError, match="não existe"):
+    with pytest.raises(ConfigError, match="does not exist"):
         cfg.get_docs_dir()
 
 
@@ -208,13 +208,13 @@ class Config:
     def get_docs_dir(self) -> Path:
         if not self.docs_dir_raw:
             raise ConfigError(
-                "RAG_DOCS_DIR não está definida. Configure o caminho da pasta "
-                "com seus documentos, ex: RAG_DOCS_DIR=C:\\Users\\voce\\Documents\\meus-pdfs"
+                "RAG_DOCS_DIR is not set. Set it to the path of the folder "
+                "containing your documents, e.g.: RAG_DOCS_DIR=C:\\Users\\you\\Documents\\my-pdfs"
             )
         path = Path(self.docs_dir_raw)
         if not path.is_dir():
             raise ConfigError(
-                f"RAG_DOCS_DIR aponta para um caminho que não existe ou não é uma pasta: {path}"
+                f"RAG_DOCS_DIR points to a path that does not exist or is not a folder: {path}"
             )
         return path
 
@@ -247,7 +247,7 @@ git commit -m "feat: add config module for docs dir, storage dir and embedding s
 
 **Interfaces:**
 - Consumes: `pathlib.Path` pointing at a folder.
-- Produces: `load_documents(docs_dir: Path) -> list[Document]` (uses `llama_index.core.schema.Document`). Prints `[aviso] Pulando '<nome>': ...` to stdout for any file that fails to load, and continues with the rest.
+- Produces: `load_documents(docs_dir: Path) -> list[Document]` (uses `llama_index.core.schema.Document`). Prints `[warning] Pulando '<nome>': ...` to stdout for any file that fails to load, and continues with the rest.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -286,7 +286,7 @@ def test_load_documents_skips_corrupted_file_with_warning(tmp_path, capsys):
     assert documents[0].text == "Documento valido."
     captured = capsys.readouterr()
     assert "quebrado.pdf" in captured.out
-    assert "[aviso]" in captured.out
+    assert "[warning]" in captured.out
 
 
 def test_load_documents_returns_empty_list_for_empty_folder(tmp_path):
@@ -317,7 +317,7 @@ def load_documents(docs_dir: Path) -> list[Document]:
         try:
             loaded = SimpleDirectoryReader(input_files=[str(file_path)]).load_data()
         except Exception as exc:  # noqa: BLE001 - intentional broad catch, see spec
-            print(f"[aviso] Pulando '{file_path.name}': não foi possível extrair texto ({exc})")
+            print(f"[warning] Skipping '{file_path.name}': could not extract text ({exc})")
             continue
         documents.extend(loaded)
     return documents
@@ -568,7 +568,7 @@ def test_run_ingestion_indexes_all_readable_documents(tmp_path, capsys):
     assert chunk_count == 2
     assert storage_dir.exists()
     captured = capsys.readouterr()
-    assert "2 documento" in captured.out
+    assert "2 document" in captured.out
     assert "2 chunk" in captured.out
 
 
@@ -590,7 +590,7 @@ def test_run_ingestion_skips_corrupted_files_and_still_indexes_rest(tmp_path, ca
 
     assert chunk_count == 1
     captured = capsys.readouterr()
-    assert "[aviso]" in captured.out
+    assert "[warning]" in captured.out
 
 
 def test_run_ingestion_returns_zero_and_warns_on_empty_folder(tmp_path, capsys):
@@ -609,7 +609,7 @@ def test_run_ingestion_returns_zero_and_warns_on_empty_folder(tmp_path, capsys):
 
     assert chunk_count == 0
     captured = capsys.readouterr()
-    assert "Nenhum documento" in captured.out
+    assert "No readable documents" in captured.out
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -641,15 +641,15 @@ def run_ingestion(
 ) -> int:
     documents = load_documents(docs_dir)
     if not documents:
-        print(f"Nenhum documento legível encontrado em '{docs_dir}'.")
+        print(f"No readable documents found in '{docs_dir}'.")
         return 0
 
     nodes = split_into_nodes(documents, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     build_index(nodes, storage_dir, embed_model, collection_name)
 
     print(
-        f"{len(documents)} documento(s) indexado(s) em {len(nodes)} chunk(s). "
-        f"Índice salvo em '{storage_dir}'."
+        f"{len(documents)} document(s) indexed into {len(nodes)} chunk(s). "
+        f"Index saved to '{storage_dir}'."
     )
     return len(nodes)
 
@@ -784,8 +784,8 @@ def search_documents(
     index = load_index(storage_dir, embed_model, collection_name)
     if index is None:
         raise IndexNotFoundError(
-            "Nenhum índice encontrado. Rode 'uv run rag-ingest' para indexar seus "
-            "documentos antes de consultar."
+            "No index found. Run 'uv run rag-ingest' to index your "
+            "documents before searching."
         )
 
     retriever = index.as_retriever(similarity_top_k=top_k)
@@ -797,7 +797,7 @@ def search_documents(
         results.append(
             {
                 "text": node.get_content(),
-                "source": node.metadata.get("file_name", "desconhecido"),
+                "source": node.metadata.get("file_name", "unknown"),
                 "score": scored_node.score if scored_node.score is not None else 0.0,
             }
         )
@@ -827,7 +827,7 @@ git commit -m "feat: add semantic search over the persisted index"
 
 **Interfaces:**
 - Consumes: `search_documents` / `IndexNotFoundError` (Task 6), `Config` (Task 1).
-- Produces: `format_results(pergunta: str, results: list[dict]) -> str`, `buscar_documentos_core(pergunta: str, top_k: int, storage_dir, embed_model, collection_name) -> str` (pure, injectable — used by both the MCP tool and the tests), the `fastmcp.FastMCP`-registered tool `buscar_documentos(pergunta: str, top_k: int = 5) -> str`, `main() -> None`.
+- Produces: `format_results(question: str, results: list[dict]) -> str`, `search_docs_core(question: str, top_k: int, storage_dir, embed_model, collection_name) -> str` (pure, injectable — used by both the MCP tool and the tests), the `fastmcp.FastMCP`-registered tool `search_docs(question: str, top_k: int = 5) -> str`, `main() -> None`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -837,7 +837,7 @@ from llama_index.core.embeddings import MockEmbedding
 from llama_index.core.schema import TextNode
 
 from rag_study.indexing import build_index
-from rag_study.mcp_server import buscar_documentos_core, format_results
+from rag_study.mcp_server import search_docs_core, format_results
 
 EMBED_MODEL = MockEmbedding(embed_dim=8)
 
@@ -859,36 +859,36 @@ def test_format_results_lists_source_and_snippet_for_each_result():
 def test_format_results_handles_empty_results():
     formatted = format_results("pergunta sem resposta", [])
 
-    assert "Nenhum trecho relevante" in formatted
+    assert "No relevant passages" in formatted
 
 
-def test_buscar_documentos_core_returns_friendly_message_when_no_index(tmp_path):
-    resposta = buscar_documentos_core(
-        pergunta="qualquer coisa",
+def test_search_docs_core_returns_friendly_message_when_no_index(tmp_path):
+    answer = search_docs_core(
+        question="qualquer coisa",
         top_k=5,
         storage_dir=tmp_path / "storage",
         embed_model=EMBED_MODEL,
         collection_name="test_mcp_missing",
     )
 
-    assert "rag-ingest" in resposta
+    assert "rag-ingest" in answer
 
 
-def test_buscar_documentos_core_returns_formatted_results(tmp_path):
+def test_search_docs_core_returns_formatted_results(tmp_path):
     storage_dir = tmp_path / "storage"
     nodes = [TextNode(text="Conteudo sobre embeddings locais.", metadata={"file_name": "embeddings.txt"})]
     build_index(nodes, storage_dir, EMBED_MODEL, collection_name="test_mcp_results")
 
-    resposta = buscar_documentos_core(
-        pergunta="O que sao embeddings?",
+    answer = search_docs_core(
+        question="O que sao embeddings?",
         top_k=3,
         storage_dir=storage_dir,
         embed_model=EMBED_MODEL,
         collection_name="test_mcp_results",
     )
 
-    assert "embeddings.txt" in resposta
-    assert "Conteudo sobre embeddings locais." in resposta
+    assert "embeddings.txt" in answer
+    assert "Conteudo sobre embeddings locais." in answer
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -911,18 +911,18 @@ from rag_study.search import IndexNotFoundError, search_documents
 mcp = FastMCP("rag-study")
 
 
-def format_results(pergunta: str, results: list[dict]) -> str:
+def format_results(question: str, results: list[dict]) -> str:
     if not results:
-        return f"Nenhum trecho relevante encontrado para: '{pergunta}'."
+        return f"No relevant passages encontrado para: '{question}'."
 
-    partes = []
+    parts = []
     for i, result in enumerate(results, start=1):
-        partes.append(f"[{i}] Fonte: {result['source']}\n{result['text']}")
-    return "\n\n".join(partes)
+        parts.append(f"[{i}] Source: {result['source']}\n{result['text']}")
+    return "\n\n".join(parts)
 
 
-def buscar_documentos_core(
-    pergunta: str,
+def search_docs_core(
+    question: str,
     top_k: int,
     storage_dir: Path,
     embed_model: BaseEmbedding,
@@ -930,7 +930,7 @@ def buscar_documentos_core(
 ) -> str:
     try:
         results = search_documents(
-            query=pergunta,
+            query=question,
             top_k=top_k,
             storage_dir=storage_dir,
             embed_model=embed_model,
@@ -938,15 +938,15 @@ def buscar_documentos_core(
         )
     except IndexNotFoundError as exc:
         return str(exc)
-    return format_results(pergunta, results)
+    return format_results(question, results)
 
 
 @mcp.tool()
-def buscar_documentos(pergunta: str, top_k: int = 5) -> str:
-    """Busca trechos relevantes nos documentos pessoais indexados para responder à pergunta."""
+def search_docs(question: str, top_k: int = 5) -> str:
+    """Searches the indexed personal documents for passages relevant to the question."""
     cfg = Config.from_env()
-    return buscar_documentos_core(
-        pergunta=pergunta,
+    return search_docs_core(
+        question=question,
         top_k=top_k,
         storage_dir=cfg.storage_dir,
         embed_model=cfg.get_embed_model(),
@@ -986,7 +986,7 @@ Expected: prints `mcp server ok` with no errors.
 
 ```bash
 git add src/rag_study/mcp_server.py tests/test_mcp_server.py pyproject.toml
-git commit -m "feat: add MCP server exposing buscar_documentos tool"
+git commit -m "feat: add MCP server exposing search_docs tool"
 ```
 
 ---
@@ -1086,13 +1086,13 @@ Expected: all tests from Tasks 1–7 pass (25 tests total: 6 + 4 + 3 + 3 + 3 + 2
 - [ ] **Step 3: Manual end-to-end check with real documents**
 
 1. Set `RAG_DOCS_DIR` to point at a real folder with a few PDFs.
-2. Run `uv run rag-ingest` — confirm it prints a summary like `"N documento(s) indexado(s) em M chunk(s)"` and that `storage/` now contains files.
+2. Run `uv run rag-ingest` — confirm it prints a summary like `"N document(s) indexed into M chunk(s)"` and that `storage/` now contains files.
 3. Run `uv run rag-mcp-server` in one terminal — confirm it starts without errors (it will block, waiting for an MCP client over stdio).
 4. Stop it with Ctrl+C.
 
 - [ ] **Step 4: Configure Claude Desktop**
 
-Follow the README's "Configurando no Claude Desktop" section with the real project path and real `RAG_DOCS_DIR`. Restart Claude Desktop. Ask a question about a document known to be in the indexed folder; confirm Claude calls `buscar_documentos` and answers using a real snippet + source filename.
+Follow the README's "Configurando no Claude Desktop" section with the real project path and real `RAG_DOCS_DIR`. Restart Claude Desktop. Ask a question about a document known to be in the indexed folder; confirm Claude calls `search_docs` and answers using a real snippet + source filename.
 
 - [ ] **Step 5: Configure Claude Code**
 
@@ -1211,7 +1211,7 @@ mais madura e com mais recursos que a versão reduzida embutida no SDK
 oficial `mcp`): o decorator `@mcp.tool()` registra uma função Python comum
 como uma tool MCP, usando a assinatura da função e a docstring para o Claude
 entender quando e como chamá-la. Mantivemos a lógica de negócio
-(`buscar_documentos_core`) separada da função decorada (`buscar_documentos`)
+(`search_docs_core`) separada da função decorada (`search_docs`)
 para poder testar a lógica diretamente, sem precisar simular o protocolo MCP
 inteiro nos testes.
 ```

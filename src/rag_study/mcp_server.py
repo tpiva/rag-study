@@ -23,11 +23,11 @@ def _get_embed_model(cfg: Config) -> BaseEmbedding:
 
 def format_results(question: str, results: list[dict]) -> str:
     if not results:
-        return f"Nenhum trecho relevante encontrado para: '{question}'."
+        return f"No relevant passages found for: '{question}'."
 
     parts = []
     for i, result in enumerate(results, start=1):
-        parts.append(f"[{i}] Fonte: {result['source']}\n{result['text']}")
+        parts.append(f"[{i}] Source: {result['source']}\n{result['text']}")
     return "\n\n".join(parts)
 
 
@@ -69,9 +69,9 @@ def main() -> None:
     # first search instant, this avoids a deadlock on Windows: loading the native
     # DLLs (scipy/torch) for the first time inside FastMCP's worker thread hung the
     # server indefinitely on the first tool call.
-    print("[rag-study] carregando modelo de embedding...", file=sys.stderr, flush=True)
+    print("[rag-study] loading embedding model...", file=sys.stderr, flush=True)
     _get_embed_model(Config.from_env())
-    print("[rag-study] modelo carregado, servidor pronto.", file=sys.stderr, flush=True)
+    print("[rag-study] model loaded, server ready.", file=sys.stderr, flush=True)
     mcp.run()
 
 

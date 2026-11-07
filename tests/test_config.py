@@ -14,7 +14,7 @@ def test_get_docs_dir_raises_when_path_does_not_exist(monkeypatch, tmp_path):
     missing = tmp_path / "nao-existe"
     monkeypatch.setenv("RAG_DOCS_DIR", str(missing))
     cfg = Config.from_env()
-    with pytest.raises(ConfigError, match="não existe"):
+    with pytest.raises(ConfigError, match="does not exist"):
         cfg.get_docs_dir()
 
 
