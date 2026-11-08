@@ -1,3 +1,5 @@
+import logging
+
 from rag_study import load_documents
 
 def test_load_documents_reads_text_file_content(tmp_path):
@@ -19,17 +21,21 @@ def test_load_documents_reads_multiple_files(tmp_path):
     assert "Segundo documento." in texts
 
 
-def test_load_documents_skips_corrupted_file_with_warning(tmp_path, capsys):
+def test_load_documents_skips_corrupted_file_with_warning(tmp_path, caplog):
     (tmp_path / "bom.txt").write_text("Documento valido.", encoding="utf-8")
     (tmp_path / "quebrado.pdf").write_bytes(b"isso nao e um pdf valido")
 
-    documents = load_documents(tmp_path)
+    with caplog.at_level(logging.WARNING):
+        documents = load_documents(tmp_path)
 
     assert len(documents) == 1
     assert documents[0].text == "Documento valido."
-    captured = capsys.readouterr()
-    assert "quebrado.pdf" in captured.out
-    assert "[warning]" in captured.out
+    assert any(
+        record.levelno == logging.WARNING
+        and "quebrado.pdf" in record.getMessage()
+        and "Skipping" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_load_documents_returns_empty_list_for_empty_folder(tmp_path):

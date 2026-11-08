@@ -13,6 +13,7 @@ class Config:
     chunk_size: int
     chunk_overlap: int
     collection_name: str = "rag_study_docs"
+    log_level: str = "INFO"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -25,6 +26,7 @@ class Config:
             ),
             chunk_size=int(os.environ.get("RAG_CHUNK_SIZE", "512")),
             chunk_overlap=int(os.environ.get("RAG_CHUNK_OVERLAP", "50")),
+            log_level=os.environ.get("RAG_LOG_LEVEL", "INFO")
         )
 
     def get_docs_dir(self) -> Path:

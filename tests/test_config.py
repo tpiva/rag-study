@@ -45,3 +45,12 @@ def test_chunk_size_defaults_and_override(monkeypatch):
     monkeypatch.setenv("RAG_CHUNK_SIZE", "256")
     cfg = Config.from_env()
     assert cfg.chunk_size == 256
+
+def test_storage_dir_defaults_to_storage_folder(monkeypatch):
+    monkeypatch.delenv("RAG_LOG_LEVEL", raising=False)
+    cfg = Config.from_env()
+    assert cfg.log_level == "INFO"
+
+def test_log_level_respects_env_override(monkeypatch):
+    monkeypatch.setenv("RAG_LOG_LEVEL", "DEBUG")
+    assert Config.from_env().log_level == "DEBUG"

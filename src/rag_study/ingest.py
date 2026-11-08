@@ -1,4 +1,5 @@
 # src/rag_study/ingest.py
+import logging
 from pathlib import Path
 
 from llama_index.core.embeddings import BaseEmbedding
@@ -7,7 +8,9 @@ from rag_study.chunking import split_into_nodes
 from rag_study.config import Config
 from rag_study.indexing import build_index
 from rag_study.loader import load_documents
+from rag_study.logging_config import setup_logging
 
+logger = logging.getLogger(__name__)
 
 def run_ingestion(
     docs_dir: Path,
@@ -19,21 +22,18 @@ def run_ingestion(
 ) -> int:
     documents = load_documents(docs_dir)
     if not documents:
-        print(f"No readable documents found in '{docs_dir}'.")
+        logger.warning("No readable documents found in %s", docs_dir)
         return 0
 
     nodes = split_into_nodes(documents, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     build_index(nodes, storage_dir, embed_model, collection_name)
 
-    print(
-        f"{len(documents)} document(s) indexed into {len(nodes)} chunk(s). "
-        f"Index saved to '{storage_dir}'."
-    )
+    logger.info("%d document(s) indexed into %d chunk(s). Index saved to %s", len(documents), len(nodes), storage_dir)
     return len(nodes)
-
 
 def main() -> None:
     cfg = Config.from_env()
+    setup_logging(cfg.log_level)
     docs_dir = cfg.get_docs_dir()
     run_ingestion(
         docs_dir=docs_dir,
