@@ -1,4 +1,6 @@
 # tests/test_mcp_server.py
+import logging
+
 from llama_index.core.embeddings import MockEmbedding
 from llama_index.core.schema import TextNode
 
@@ -77,9 +79,24 @@ def test_get_embed_model_loads_once_and_reuses_across_calls(monkeypatch):
 
 def test_main_loads_embed_model_before_serving(monkeypatch):
     order = []
+    monkeypatch.setattr(mcp_server, "setup_logging", lambda level: order.append("logging"))
     monkeypatch.setattr(mcp_server, "_get_embed_model", lambda cfg: order.append("load"))
     monkeypatch.setattr(mcp_server.mcp, "run", lambda: order.append("run"))
 
     mcp_server.main()
 
-    assert order == ["load", "run"]
+    assert order == ["logging", "load", "run"]
+
+
+def test_main_logs_startup_messages(monkeypatch, caplog):
+    order = []
+    monkeypatch.setattr(mcp_server, "setup_logging", lambda level: order.append("logging"))
+    monkeypatch.setattr(mcp_server, "_get_embed_model", lambda cfg: order.append("load"))
+    monkeypatch.setattr(mcp_server.mcp, "run", lambda: order.append("run"))
+
+    with caplog.at_level(logging.INFO):
+        mcp_server.main()
+    messages = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert order == ["logging", "load", "run"]
+    assert "loading embedding model..." in messages
+    assert "model loaded, server ready." in messages

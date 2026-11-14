@@ -95,6 +95,7 @@ Variáveis de ambiente opcionais (com valores padrão):
 | `RAG_EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Modelo de embedding local |
 | `RAG_CHUNK_SIZE` | `512` | Tamanho de cada chunk |
 | `RAG_CHUNK_OVERLAP` | `50` | Sobreposição entre chunks |
+| `RAG_LOG_LEVEL` | `INFO` | Nível de log: `DEBUG`, `INFO`, `WARNING` ou `ERROR` (valores inválidos voltam para `INFO`). Os logs vão para stderr |
 
 **Indexe seus documentos** (rode sempre que adicionar/alterar arquivos):
 

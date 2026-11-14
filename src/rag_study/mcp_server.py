@@ -1,5 +1,5 @@
 # src/rag_study/mcp_server.py
-import sys
+import logging
 from pathlib import Path
 
 from fastmcp import FastMCP
@@ -8,12 +8,14 @@ from pydantic import ValidationError
 
 from rag_study.config import Config
 from rag_study.constants import errors
+from rag_study.logging_config import setup_logging
 from rag_study.schemas import SearchDocsSchema
 from rag_study.search import IndexNotFoundError, search_documents
 
 mcp = FastMCP("rag-study")
 
 _embed_model_cache: BaseEmbedding | None = None
+logger = logging.getLogger(__name__)
 
 
 def _get_embed_model(cfg: Config) -> BaseEmbedding:
@@ -50,6 +52,7 @@ def search_docs_core(
             collection_name=collection_name,
         )
     except IndexNotFoundError as exc:
+        logger.error("Error indexing file", exc_info=exc)
         return {
             "success": False,
             "message": str(exc),
@@ -101,9 +104,11 @@ def main() -> None:
     # first search instant, this avoids a deadlock on Windows: loading the native
     # DLLs (scipy/torch) for the first time inside FastMCP's worker thread hung the
     # server indefinitely on the first tool call.
-    print("[rag-study] loading embedding model...", file=sys.stderr, flush=True)
-    _get_embed_model(Config.from_env())
-    print("[rag-study] model loaded, server ready.", file=sys.stderr, flush=True)
+    cfg = Config.from_env()
+    setup_logging(cfg.log_level)
+    logger.info("loading embedding model...")    
+    _get_embed_model(cfg)
+    logger.info("model loaded, server ready.")
     mcp.run()
 
 

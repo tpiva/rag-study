@@ -93,6 +93,7 @@ Optional environment variables (with defaults):
 | `RAG_EMBEDDING_MODEL` | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Local embedding model |
 | `RAG_CHUNK_SIZE` | `512` | Size of each chunk |
 | `RAG_CHUNK_OVERLAP` | `50` | Overlap between chunks |
+| `RAG_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARNING` or `ERROR` (invalid values fall back to `INFO`). Logs go to stderr |
 
 **Index your documents** (run whenever files are added/changed):
 
