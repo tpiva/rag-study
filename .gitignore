@@ -14,3 +14,6 @@ wheels/
 storage/*
 !storage/.gitkeep
 .env
+
+# file to configure rag
+rag-study.config.json
