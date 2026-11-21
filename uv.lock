@@ -3456,6 +3456,7 @@ source = { editable = "." }
 dependencies = [
     { name = "chromadb" },
     { name = "fastmcp" },
+    { name = "filelock" },
     { name = "llama-index-core" },
     { name = "llama-index-embeddings-huggingface" },
     { name = "llama-index-readers-file" },
@@ -3472,6 +3473,7 @@ dev = [
 requires-dist = [
     { name = "chromadb", specifier = ">=1.5.9" },
     { name = "fastmcp", specifier = ">=3.4.5" },
+    { name = "filelock", specifier = ">=3.32.2" },
     { name = "llama-index-core", specifier = ">=0.14.23" },
     { name = "llama-index-embeddings-huggingface", specifier = ">=0.7.0" },
     { name = "llama-index-readers-file", specifier = ">=0.6.0" },

@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "chromadb>=1.5.9",
     "fastmcp>=3.4.5",
+    "filelock>=3.32.2",
     "llama-index-core>=0.14.23",
     "llama-index-embeddings-huggingface>=0.7.0",
     "llama-index-readers-file>=0.6.0",
